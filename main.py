@@ -54,7 +54,10 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         test_video_url = sys.argv[1]
     else:
-        test_video_url = input("\n請輸入你要分析的 YouTube 影片網址: ")
+        # 在 GitHub Actions 等無頭環境中，如果沒有傳入參數，避免使用 input() 導致程式崩潰 (EOFError)
+        print("\nℹ️ 未提供影片網址。這是一次自動排程執行 (Cron-job)。")
+        print("🔧 未來這裡將會加入自動獲取最新影片的邏輯，目前先以測試網址執行，確保流程暢通。")
+        test_video_url = "https://www.youtube.com/watch?v=BfdLvZRR660" # 預設測試網址
         
     if test_video_url:
         process_youtube_video(test_video_url)
