@@ -8,11 +8,11 @@ def get_recent_tweets(username: str, auth_token: str = None, pages: int = 1):
     """
     app = Twitter("session")
     
-    if auth_token:
-        # 登入以繞過 Twitter 限制
-        app.load_auth_token(auth_token)
-    
     try:
+        if auth_token:
+            # 登入以繞過 Twitter 限制
+            app.load_auth_token(auth_token)
+        
         print(f"正在抓取 @{username} 的最新推文...")
         # 取得使用者推文 (包含回覆)
         tweets = app.get_tweets(username, pages=pages)
