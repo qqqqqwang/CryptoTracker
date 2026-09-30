@@ -7,3 +7,4 @@ Pillow==11.3.0
 yt-dlp==2024.3.10
 opencv-python-headless==4.9.0.80
 tweety-ns==2.4.1
+numpy<2
