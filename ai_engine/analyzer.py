@@ -34,3 +34,46 @@ def analyze_crypto_text(text: str, api_key: str) -> str:
         
     except Exception as e:
         return f"❌ AI 分析失敗: {str(e)}"
+
+from PIL import Image
+
+def analyze_crypto_multimodal(transcript: str, image_path: str, api_key: str):
+    """
+    綜合分析字幕與截圖 (若其中一個缺失則自動適應)
+    """
+    if not api_key:
+        return "❌ 錯誤: 未提供 Gemini API Key"
+        
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-3.8-flash')
+        
+        prompt = """
+        你是一個專業的加密貨幣交易訊號過濾器。
+        我將提供一位分析師最新 YouTube 影片的資訊給你。
+        
+        【排版與內容嚴格規則】：
+        1. ⚠️ **絕對不要使用 Markdown 表格 (Table)**：請一律使用「條列式 (Bullet points)」搭配粗體與 Emoji。
+        2. **標題動態化**：根據提及的「所有幣種」下標，例如 `# 🔔 [BTC, SOL] 最新交易策略`。
+        3. **大盤觀點**：精簡總結短線與長線觀點。
+        4. **操作策略與點位**：明確列出阻力、支撐、目標價。過濾掉免責聲明。
+        """
+        
+        contents = [prompt]
+        
+        if transcript and not transcript.startswith("❌"):
+            contents.append(f"\n以下是影片字幕內容：\n{transcript}\n")
+            
+        if image_path and not image_path.startswith("❌") and os.path.exists(image_path):
+            contents.append("\n以下是影片片尾的總結圖表截圖：\n")
+            contents.append(Image.open(image_path))
+            
+        if len(contents) == 1:
+            return "❌ 無法取得任何分析材料 (無字幕且無圖表)"
+            
+        response = model.generate_content(contents)
+        return response.text.strip()
+        
+    except Exception as e:
+        return f"❌ 綜合 AI 分析失敗: {str(e)}"
