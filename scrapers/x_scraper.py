@@ -13,8 +13,8 @@ def get_recent_tweets(username: str, pages: int = 1):
     client = ApifyClient(apify_token)
 
     run_input = {
-        "twitterHandles": [username],
-        "maxItems": 3,
+        "startUrls": [{"url": f"https://twitter.com/{username}"}],
+        "tweetsDesired": 3,
     }
 
     try:
