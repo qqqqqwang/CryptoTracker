@@ -1,8 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from scrapers.youtube_scraper import get_video_transcript
-from ai_engine.analyzer import analyze_crypto_text
+from scrapers.youtube_vision import get_video_end_frame, analyze_crypto_image
 from notifier.discord_bot import send_to_discord
 
 from scrapers.x_scraper import get_recent_tweets
@@ -11,38 +10,44 @@ from ai_engine.tweet_analyzer import filter_and_analyze_tweet
 def process_youtube_video(video_url: str):
     print(f"\n🎬 開始處理 YouTube 影片: {video_url}")
 
-    print("⏳ 正在擷取影片字幕...")
-    transcript = get_video_transcript(video_url)
-    if transcript.startswith("❌"):
-        print(transcript)
+    print("⏳ 正在下載並截取片尾畫面...")
+    image_path = get_video_end_frame(video_url)
+    if image_path.startswith("❌"):
+        print(image_path)
         return
 
-    print("✅ 字幕擷取成功，準備進行 AI 分析...")
+    print("✅ 截圖成功，準備進行 AI 視覺分析...")
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key or "你的_GEMINI_API_KEY" in api_key:
         print("❌ 找不到 GEMINI_API_KEY")
         return
 
-    analysis_result = analyze_crypto_text(transcript, api_key)
+    analysis_result = analyze_crypto_image(image_path, api_key)
     if analysis_result.startswith("❌"):
         print(analysis_result)
         return
 
-    print("✅ AI 分析完成！準備推播至 Discord...")
+    print("✅ AI 視覺分析完成！準備推播至 Discord...")
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
     if not webhook_url or "你的_DISCORD_WEBHOOK" in webhook_url:
         print("❌ 找不到 DISCORD_WEBHOOK_URL")
         return
 
+    # 在訊息中補上 URL
+    final_content = analysis_result.replace("發布渠道**：YouTube", f"發布渠道**：YouTube\n   🔗 **影片連結**：{video_url}")
+
     success = send_to_discord(
-        title="📈 AI 加密貨幣交易訊號 (來自 YouTube)",
-        content=analysis_result,
+        title="📊 AI 交易訊號 (視覺讀圖)",
+        content=final_content,
         webhook_url=webhook_url,
         url=video_url
     )
 
     if success:
         print("🎉 YouTube 流程完成！")
+        # 清理暫存圖片
+        if os.path.exists(image_path):
+            os.remove(image_path)
 
 def process_twitter_account(username: str):
     print(f"\n🐦 開始追蹤 X 帳號: @{username}")
@@ -86,7 +91,7 @@ if __name__ == "__main__":
     # 1. 執行 X (Twitter) 自動追蹤與過濾
     process_twitter_account("giantcutie666")
     
-    # 2. 執行 YouTube (目前仍先跑測試網址確保流程暢通，待下次加入視覺擷圖模組)
+    # 2. 執行 YouTube 視覺擷圖分析
     print("\nℹ️ 執行 YouTube 預設測試流程...")
     test_video_url = "https://www.youtube.com/watch?v=BfdLvZRR660"
     process_youtube_video(test_video_url)
