@@ -24,8 +24,8 @@ def get_recent_tweets(username: str, pages: int = 1):
         extracted_tweets = []
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
             tweet_text = item.get("full_text")
-            tweet_id = item.get("id")
-            tweet_url = item.get("url")
+            tweet_id = item.get("id_str") or str(item.get("id"))
+            tweet_url = item.get("permalink") or item.get("url") or f"https://x.com/i/status/{tweet_id}"
             date = item.get("created_at")
             
             if tweet_text and tweet_id:
@@ -41,4 +41,4 @@ def get_recent_tweets(username: str, pages: int = 1):
         
     except Exception as e:
         print(f"❌ 抓取 Twitter 失敗: {str(e)}")
-        return []
+        return None

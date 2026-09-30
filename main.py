@@ -85,8 +85,12 @@ def process_twitter_account(username: str):
 
     # 為了確保抓到更新，稍微多抓幾則，再用程式過濾
     tweets = get_recent_tweets(username, pages=1)
-    if not tweets:
-        print("❌ 抓取推文失敗或無新推文。")
+    
+    if tweets is None:
+        print("❌ 抓取推文失敗 (API 錯誤或資料格式解析失敗)。")
+        return
+    elif not tweets:
+        print("💤 該帳號目前沒有任何推文。")
         return
 
     api_key = os.environ.get("GEMINI_API_KEY")
