@@ -19,15 +19,14 @@ def get_recent_tweets(username: str, pages: int = 1):
 
     try:
         print(f"正在透過 Apify 抓取 @{username} 的最新推文...")
-        run = client.actor("apidojo/tweet-scraper").call(run_input=run_input)
+        run = client.actor("quacker/twitter-scraper").call(run_input=run_input)
         
         extracted_tweets = []
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            # Apidojo 回傳的資料結構
-            tweet_text = item.get("text") or item.get("full_text")
+            tweet_text = item.get("full_text")
             tweet_id = item.get("id")
             tweet_url = item.get("url")
-            date = item.get("createdAt")
+            date = item.get("created_at")
             
             if tweet_text and tweet_id:
                 extracted_tweets.append({
