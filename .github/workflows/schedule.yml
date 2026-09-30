@@ -1,25 +1,28 @@
-name: Crypto KOL Tracker Auto-Run
+name: Auto Tracker Schedule
 
 on:
   schedule:
-    # 每 2 小時執行一次 (UTC時間)
     - cron: '0 */2 * * *'
   workflow_dispatch:
-    # 允許在 GitHub 網頁上手動點擊按鈕執行
 
 jobs:
   run-tracker:
     runs-on: ubuntu-latest
 
+    # 確保有寫入權限，以便推送 state.json
+    permissions:
+      contents: write
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -28,9 +31,26 @@ jobs:
 
       - name: Run Crypto Tracker Bot
         env:
-          # 從 GitHub Secrets 中讀取機密金鑰
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
         run: |
+          # 若有提供 YouTube Cookies，將其寫入檔案供 yt-dlp 使用
+          if [ -n "${{ secrets.YOUTUBE_COOKIES }}" ]; then
+            echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
+          fi
+          
           python main.py
+
+      - name: Commit state.json back to repository
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add state.json
+          # 如果 state.json 有變動才進行 commit 和 push
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update tracking state [skip ci]"
+            git push
+          else
+            echo "No changes to state.json, skipping commit."
+          fi

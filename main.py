@@ -2,25 +2,22 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# YouTube 模組
 from scrapers.youtube_scraper import get_video_transcript
 from scrapers.youtube_vision import get_video_end_frame
 from ai_engine.analyzer import analyze_crypto_multimodal
-
-# 推播模組
 from notifier.discord_bot import send_to_discord
-
-# Twitter 模組 (Apify)
 from scrapers.x_scraper import get_recent_tweets
 from ai_engine.tweet_analyzer import filter_and_analyze_tweet
+from state_manager import load_state, save_state
 
 def process_youtube_video(video_url: str):
-    """
-    綜合分析模式：同時嘗試獲取字幕(CC)與片尾截圖(Vision)。
-    只要其中一項成功，就交給 Gemini 進行推理分析。
-    """
     print(f"\n🎬 開始處理 YouTube 影片 (綜合分析模式): {video_url}")
     
+    state = load_state()
+    if state.get("last_youtube_url") == video_url:
+        print("💤 影片無更新，跳過分析。")
+        return
+
     api_key = os.environ.get("GEMINI_API_KEY")
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
 
@@ -31,16 +28,14 @@ def process_youtube_video(video_url: str):
         print("❌ 找不到 DISCORD_WEBHOOK_URL")
         return
 
-    # 1. 嘗試抓取字幕
     print("⏳ 嘗試擷取影片字幕 (CC)...")
     transcript = get_video_transcript(video_url)
     if transcript.startswith("❌"):
-        print(f"⚠️ 字幕抓取失敗 (或該影片無字幕): {transcript}")
+        print(f"⚠️ 字幕抓取失敗: {transcript}")
         transcript = None
     else:
         print("✅ 成功獲取字幕！")
 
-    # 2. 嘗試抓取截圖
     print("⏳ 嘗試下載並截取片尾畫面 (Vision)...")
     image_path = get_video_end_frame(video_url)
     if image_path.startswith("❌"):
@@ -49,16 +44,13 @@ def process_youtube_video(video_url: str):
     else:
         print("✅ 成功獲取片尾截圖！")
 
-    # 3. 判斷是否有任何素材
     if not transcript and not image_path:
         print("❌ 影片所有抓取管道皆失敗，無法進行分析。")
         return
 
-    # 4. 進行綜合 AI 分析
     print("🧠 將取得的素材交給 Gemini 進行綜合分析...")
     analysis_result = analyze_crypto_multimodal(transcript, image_path, api_key)
     
-    # 清理暫存圖片
     if image_path and os.path.exists(image_path):
         os.remove(image_path)
 
@@ -66,9 +58,6 @@ def process_youtube_video(video_url: str):
         print(analysis_result)
         return
 
-    print("✅ AI 綜合分析完成！準備推播至 Discord...")
-
-    # 格式化 Header
     header = f"👤 **分析師**：大漂亮 (GiantCutie-K)\n📺 **發布渠道**：YouTube\n🔗 **影片連結**：{video_url}\n---\n"
     final_content = header + analysis_result
 
@@ -81,15 +70,20 @@ def process_youtube_video(video_url: str):
 
     if success:
         print("🎉 YouTube 綜合分析推播完成！")
+        state["last_youtube_url"] = video_url
+        save_state(state)
 
 def process_twitter_account(username: str):
     print(f"\n🐦 開始追蹤 X 帳號: @{username}")
     apify_token = os.environ.get("APIFY_API_TOKEN")
     if not apify_token:
-        print("❌ 找不到 APIFY_API_TOKEN，請確認環境變數或 GitHub Secrets")
+        print("❌ 找不到 APIFY_API_TOKEN")
         return
 
-    # 抓取最新推文
+    state = load_state()
+    last_tweet_id = state.get("last_tweet_id")
+
+    # 為了確保抓到更新，稍微多抓幾則，再用程式過濾
     tweets = get_recent_tweets(username, pages=1)
     if not tweets:
         print("❌ 抓取推文失敗或無新推文。")
@@ -97,10 +91,23 @@ def process_twitter_account(username: str):
 
     api_key = os.environ.get("GEMINI_API_KEY")
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
-
-    print(f"⏳ 成功抓取 {len(tweets)} 則推文，交給 AI 過濾前 3 則最新內容...")
     
-    for tweet in tweets[:3]:
+    new_tweets = []
+    for tweet in tweets:
+        # Twitter ID 越大代表越新，我們比較 ID 大小來判斷是否為新推文
+        if last_tweet_id is None or int(tweet['id']) > int(last_tweet_id):
+            new_tweets.append(tweet)
+
+    if not new_tweets:
+        print("💤 自上次排程以來沒有新推文。")
+        return
+
+    print(f"⏳ 發現 {len(new_tweets)} 則新推文，交給 AI 過濾...")
+    
+    max_processed_id = last_tweet_id
+    
+    # 從舊到新處理，這樣如果中斷，狀態紀錄比較準確
+    for tweet in reversed(new_tweets):
         result = filter_and_analyze_tweet(tweet['text'], tweet['url'], api_key)
         
         if "無效訊號" in result:
@@ -115,14 +122,21 @@ def process_twitter_account(username: str):
                 webhook_url=webhook_url,
                 url=tweet['url']
             )
+        
+        # 更新目前處理過的最大推文 ID
+        if max_processed_id is None or int(tweet['id']) > int(max_processed_id):
+            max_processed_id = tweet['id']
+
+    # 處理完所有新推文後，儲存狀態
+    if max_processed_id:
+        state["last_tweet_id"] = str(max_processed_id)
+        save_state(state)
 
 if __name__ == "__main__":
     load_dotenv()
     print("🚀 Crypto KOL Tracker 啟動！")
     
-    # 1. 執行 X (Twitter) 自動追蹤與過濾
     process_twitter_account("giantcutie666")
     
-    # 2. 執行 YouTube 綜合分析
     test_video_url = "https://www.youtube.com/watch?v=BfdLvZRR660"
     process_youtube_video(test_video_url)

@@ -18,6 +18,9 @@ def get_video_end_frame(video_url: str, output_image_path: str = "end_frame.jpg"
         'quiet': True,
         'noplaylist': True,
     }
+    
+    if os.path.exists("cookies.txt"):
+        ydl_opts['cookiefile'] = "cookies.txt"
 
     try:
         # 如果存在舊檔案則先刪除
