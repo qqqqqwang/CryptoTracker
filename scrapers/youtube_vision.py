@@ -10,35 +10,45 @@ def get_video_end_frame(video_url: str, output_image_path: str = "end_frame.jpg"
     """
     print(f"🎥 正在解析 YouTube 影片: {video_url}")
     
-    # yt-dlp 設定：抓取最低畫質即可，節省流量與記憶體
+    # yt-dlp 設定：抓取最低畫質即可，並下載為暫存檔案
+    temp_video_file = "temp_video.mp4"
     ydl_opts = {
-        'format': 'worst',
+        'format': 'worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst',
+        'outtmpl': temp_video_file,
         'quiet': True,
         'noplaylist': True,
     }
 
     try:
+        # 如果存在舊檔案則先刪除
+        if os.path.exists(temp_video_file):
+            os.remove(temp_video_file)
+
+        print("⏱️ 正在下載影片暫存檔...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            stream_url = info.get('url')
+            info = ydl.extract_info(video_url, download=True)
             duration = info.get('duration', 0)
 
-        if not stream_url or duration == 0:
-            return "❌ 無法解析影片串流或長度"
+        if not os.path.exists(temp_video_file):
+            return "❌ 影片下載失敗"
 
-        print(f"⏱️ 影片總長度: {duration} 秒，正在讀取串流...")
+        print(f"⏱️ 影片總長度: {duration} 秒，正在讀取畫面...")
         
-        # 使用 OpenCV 讀取串流
-        cap = cv2.VideoCapture(stream_url)
+        # 使用 OpenCV 讀取本地檔案
+        cap = cv2.VideoCapture(temp_video_file)
         if not cap.isOpened():
-            return "❌ OpenCV 無法開啟影片串流"
+            return "❌ OpenCV 無法開啟本地影片"
 
-        # 跳轉到倒數 5 秒的位置 (大漂亮的圖表通常停留在最後幾秒)
+        # 跳轉到倒數 5 秒的位置
         target_time = max(0, duration - 5)
         cap.set(cv2.CAP_PROP_POS_MSEC, target_time * 1000)
 
         ret, frame = cap.read()
         cap.release()
+        
+        # 刪除暫存影片
+        if os.path.exists(temp_video_file):
+            os.remove(temp_video_file)
 
         if ret:
             cv2.imwrite(output_image_path, frame)
