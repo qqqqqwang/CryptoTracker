@@ -1,31 +1,42 @@
 import os
-from tweety import Twitter
-from tweety.filters import SearchFilters
+from apify_client import ApifyClient
 
-def get_recent_tweets(username: str, auth_token: str = None, pages: int = 1):
+def get_recent_tweets(username: str, pages: int = 1):
     """
-    使用 tweety-ns 抓取使用者的最新推文與回覆
+    使用 Apify (apidojo/tweet-scraper) 抓取使用者的最新推文與回覆
     """
-    app = Twitter("session")
-    
+    apify_token = os.environ.get("APIFY_API_TOKEN")
+    if not apify_token:
+        print("❌ 找不到 APIFY_API_TOKEN")
+        return []
+
+    client = ApifyClient(apify_token)
+
+    run_input = {
+        "twitterHandles": [username],
+        "maxItems": 3,
+    }
+
     try:
-        if auth_token:
-            # 登入以繞過 Twitter 限制
-            app.load_auth_token(auth_token)
-        
-        print(f"正在抓取 @{username} 的最新推文...")
-        # 取得使用者推文 (包含回覆)
-        tweets = app.get_tweets(username, pages=pages)
+        print(f"正在透過 Apify 抓取 @{username} 的最新推文...")
+        run = client.actor("apidojo/tweet-scraper").call(run_input=run_input)
         
         extracted_tweets = []
-        for tweet in tweets:
-            extracted_tweets.append({
-                "id": tweet.id,
-                "text": tweet.text,
-                "url": tweet.url,
-                "date": tweet.date,
-                "is_reply": tweet.is_reply
-            })
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            # Apidojo 回傳的資料結構
+            tweet_text = item.get("text") or item.get("full_text")
+            tweet_id = item.get("id")
+            tweet_url = item.get("url")
+            date = item.get("createdAt")
+            
+            if tweet_text and tweet_id:
+                extracted_tweets.append({
+                    "id": tweet_id,
+                    "text": tweet_text,
+                    "url": tweet_url,
+                    "date": date,
+                    "is_reply": item.get("isReply", False)
+                })
             
         return extracted_tweets
         

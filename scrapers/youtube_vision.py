@@ -17,6 +17,7 @@ def get_video_end_frame(video_url: str, output_image_path: str = "end_frame.jpg"
         'outtmpl': temp_video_file,
         'quiet': True,
         'noplaylist': True,
+        'cookiesfrombrowser': ('chrome', ) # 自動讀取 Chrome 瀏覽器的 YouTube 登入狀態來繞過阻擋
     }
 
     try:

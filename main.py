@@ -51,13 +51,13 @@ def process_youtube_video(video_url: str):
 
 def process_twitter_account(username: str):
     print(f"\n🐦 開始追蹤 X 帳號: @{username}")
-    auth_token = os.environ.get("X_AUTH_TOKEN")
-    if not auth_token:
-        print("❌ 找不到 X_AUTH_TOKEN，請確認環境變數或 GitHub Secrets")
+    apify_token = os.environ.get("APIFY_API_TOKEN")
+    if not apify_token:
+        print("❌ 找不到 APIFY_API_TOKEN，請確認環境變數或 GitHub Secrets")
         return
 
     # 抓取最新推文
-    tweets = get_recent_tweets(username, auth_token=auth_token, pages=1)
+    tweets = get_recent_tweets(username, pages=1)
     if not tweets:
         print("❌ 抓取推文失敗或無新推文。")
         return
