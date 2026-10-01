@@ -10,7 +10,7 @@ from scrapers.x_scraper import get_recent_tweets
 from ai_engine.tweet_analyzer import filter_and_analyze_tweet
 from state_manager import load_state, save_state
 
-def process_youtube_video(video_url: str):
+def process_youtube_video(video_url: str, kol_name: str):
     print(f"\n🎬 開始處理 YouTube 影片 (綜合分析模式): {video_url}")
     
     state = load_state()
@@ -58,7 +58,7 @@ def process_youtube_video(video_url: str):
         print(analysis_result)
         return
 
-    header = f"👤 **分析師**：大漂亮 (GiantCutie-K)\n📺 **發布渠道**：YouTube\n🔗 **影片連結**：{video_url}\n---\n"
+    header = f"👤 **分析師**：{kol_name}\n📺 **發布渠道**：YouTube\n🔗 **影片連結**：{video_url}\n---\n"
     final_content = header + analysis_result
 
     success = send_to_discord(
@@ -73,15 +73,17 @@ def process_youtube_video(video_url: str):
         state["last_youtube_url"] = video_url
         save_state(state)
 
-def process_twitter_account(username: str):
-    print(f"\n🐦 開始追蹤 X 帳號: @{username}")
+def process_twitter_account(username: str, kol_name: str):
+    print(f"\n🐦 開始追蹤 X 帳號: @{username} ({kol_name})")
     apify_token = os.environ.get("APIFY_API_TOKEN")
     if not apify_token:
         print("❌ 找不到 APIFY_API_TOKEN")
         return
 
     state = load_state()
-    last_tweet_id = state.get("last_tweet_id")
+    # 支援多位 KOL，給每個 username 獨立的 state key
+    state_key = f"last_tweet_id_{username}"
+    last_tweet_id = state.get(state_key)
 
     # 為了確保抓到更新，稍微多抓幾則，再用程式過濾
     tweets = get_recent_tweets(username, pages=1)
@@ -112,7 +114,7 @@ def process_twitter_account(username: str):
     
     # 從舊到新處理，這樣如果中斷，狀態紀錄比較準確
     for tweet in reversed(new_tweets):
-        result = filter_and_analyze_tweet(tweet['text'], tweet['url'], api_key)
+        result = filter_and_analyze_tweet(tweet['text'], tweet['url'], api_key, kol_name)
         
         if "無效訊號" in result:
             print(f"💤 忽略推文 [{tweet['id']}]: 生活廢文/無交易訊號")
@@ -133,14 +135,20 @@ def process_twitter_account(username: str):
 
     # 處理完所有新推文後，儲存狀態
     if max_processed_id:
-        state["last_tweet_id"] = str(max_processed_id)
+        state[state_key] = str(max_processed_id)
         save_state(state)
 
 if __name__ == "__main__":
     load_dotenv()
     print("🚀 Crypto KOL Tracker 啟動！")
     
-    process_twitter_account("giantcutie666")
+    # 未來如果要擴充，只要把新的 KOL 加進這份清單即可
+    KOLS = [
+        {"name": "大漂亮 (GiantCutie-K)", "x_username": "giantcutie666"}
+    ]
+    
+    for kol in KOLS:
+        process_twitter_account(kol["x_username"], kol["name"])
     
     test_video_url = "https://www.youtube.com/watch?v=BfdLvZRR660"
-    process_youtube_video(test_video_url)
+    process_youtube_video(test_video_url, "大漂亮 (GiantCutie-K)")

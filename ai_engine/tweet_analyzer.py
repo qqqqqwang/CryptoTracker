@@ -1,7 +1,7 @@
 import os
 import google.generativeai as genai
 
-def filter_and_analyze_tweet(tweet_text: str, tweet_url: str, api_key: str):
+def filter_and_analyze_tweet(tweet_text: str, tweet_url: str, api_key: str, kol_name: str):
     """
     分析推文是否包含交易信號，並格式化輸出。
     如果只是生活閒聊，則回傳 "無效訊號"
@@ -16,7 +16,7 @@ def filter_and_analyze_tweet(tweet_text: str, tweet_url: str, api_key: str):
         
         prompt = f"""
         你是一個專業的金融市場（加密貨幣、美股與宏觀經濟）交易訊號過濾器。
-        請閱讀以下這則來自分析師（大漂亮 GiantCutie-K）的推文。
+        請閱讀以下這則來自分析師（{kol_name}）的推文。
 
         任務：
         1. 判斷這則推文是否包含「加密貨幣交易訊號、美股/A股觀點、宏觀經濟分析、財報解讀、或科技產業鏈動態」。即使不是純加密貨幣，只要對金融投資有參考價值（例如半導體、AI硬體、中美市場走勢），都必須視為「有效訊號」。
@@ -27,7 +27,7 @@ def filter_and_analyze_tweet(tweet_text: str, tweet_url: str, api_key: str):
         1. ⚠️ **絕對不要使用 Markdown 表格 (Table)**，請用「條列式 (Bullet points)」搭配粗體。
         2. **標題動態化**：根據提及的幣種或股票代碼下標，如 `# 🔔 [BTC, $MU] 交易策略通知`。
         3. **資訊來源 Header**（直接照抄填入）：
-           👤 **分析師**：大漂亮 (GiantCutie-K)
+           👤 **分析師**：{kol_name}
            📺 **發布渠道**：X (Twitter)
            🔗 **原文連結**：{tweet_url}
            ---
