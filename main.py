@@ -138,17 +138,27 @@ def process_twitter_account(username: str, kol_name: str):
         state[state_key] = str(max_processed_id)
         save_state(state)
 
+from scrapers.youtube_rss import get_latest_youtube_video
+
 if __name__ == "__main__":
     load_dotenv()
     print("🚀 Crypto KOL Tracker 啟動！")
     
     # 未來如果要擴充，只要把新的 KOL 加進這份清單即可
     KOLS = [
-        {"name": "大漂亮 (GiantCutie-K)", "x_username": "giantcutie666"}
+        {
+            "name": "大漂亮 (GiantCutie-K)", 
+            "x_username": "giantcutie666",
+            "youtube_channel_id": "UCkSCETUQ-oPbVccY9Z7vZZg" # 大漂亮的 Channel ID
+        }
     ]
     
     for kol in KOLS:
         process_twitter_account(kol["x_username"], kol["name"])
-    
-    test_video_url = "https://www.youtube.com/watch?v=BfdLvZRR660"
-    process_youtube_video(test_video_url, "大漂亮 (GiantCutie-K)")
+        
+        if kol.get("youtube_channel_id"):
+            latest_video_url = get_latest_youtube_video(kol["youtube_channel_id"])
+            if latest_video_url:
+                process_youtube_video(latest_video_url, kol["name"])
+            else:
+                print(f"⚠️ 無法獲取 {kol['name']} 的 YouTube 最新影片。")
